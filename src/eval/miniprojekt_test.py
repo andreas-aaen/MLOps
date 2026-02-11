@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim 
+import torch.optim as optim
 import torchvision.models as models
 from torchvision.io import decode_image
 import torchvision.transforms as transforms
@@ -23,15 +23,14 @@ dataset_path = r"/ceph/home/student.aau.dk/rk33gs/my_datasets/miniprojekt_datase
 
 
 classes_to_idx = {
-            "angry": 0,
-            "disgust": 1, 
-            "fear": 2, 
-            "happy": 3, 
-            "neutral": 4, 
-            "sad": 5, 
-            "surprise": 6
-            }
-
+    "angry": 0,
+    "disgust": 1,
+    "fear": 2,
+    "happy": 3,
+    "neutral": 4,
+    "sad": 5,
+    "surprise": 6,
+}
 
 
 image_path_list = []
@@ -46,18 +45,22 @@ for class_name, class_idx in classes_to_idx.items():
         image_label_list.append(class_idx)
 
 
+train_val_paths, test_paths, train_val_labels, test_labels = train_test_split(
+    image_path_list, image_label_list, test_size=0.1, random_state=42
+)
+train_paths, val_paths, train_labels, val_labels = train_test_split(
+    train_val_paths, train_val_labels, test_size=0.11, random_state=42
+)
 
-train_val_paths, test_paths, train_val_labels, test_labels = train_test_split(image_path_list, image_label_list, test_size=0.1, random_state=42)
-train_paths, val_paths, train_labels, val_labels = train_test_split(train_val_paths, train_val_labels, test_size=0.11, random_state=42)
 
-
-val_test_transform = transforms.Compose([
-    transforms.Resize((256)),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
-
+val_test_transform = transforms.Compose(
+    [
+        transforms.Resize((256)),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ]
+)
 
 
 class CustomDataset(Dataset):
@@ -77,16 +80,11 @@ class CustomDataset(Dataset):
         return image, label
 
 
+test_set = CustomDataset(test_paths, test_labels, transform=val_test_transform)
 
-test_set = CustomDataset(test_paths, 
-                         test_labels, 
-                         transform=val_test_transform)
-
-test_dataloader = DataLoader(test_set, 
-                             batch_size=32, 
-                             shuffle=False, 
-                             num_workers=2, 
-                             pin_memory=True)
+test_dataloader = DataLoader(
+    test_set, batch_size=32, shuffle=False, num_workers=2, pin_memory=True
+)
 
 
 if torch.cuda.is_available():
@@ -97,7 +95,6 @@ else:
     device = torch.device("cpu")
 
 print(f"Using device: {device}")
-
 
 
 model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
@@ -113,11 +110,11 @@ model.fc = nn.Sequential(
     nn.Linear(model.fc.in_features, 256),
     nn.ReLU(),
     nn.Dropout(p=0.3),
-    nn.Linear(256, 7)
+    nn.Linear(256, 7),
 )
 
 for param in model.fc.parameters():
-        param.requires_grad = True
+    param.requires_grad = True
 
 model.load_state_dict(torch.load("best_resnet50_emotion1.pth", map_location=device))
 model = model.to(device)
@@ -137,4 +134,4 @@ print(classification_report(all_labels, all_preds, target_names=classes_to_idx.k
 
 cm = confusion_matrix(all_labels, all_preds)
 print("Confusion Matrix (rows = true labels, columns = predicted labels):")
-print(np.array2string(cm, separator=', '))
+print(np.array2string(cm, separator=", "))
