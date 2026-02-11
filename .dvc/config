@@ -1,0 +1,7 @@
+[core]
+    remote = minio
+['remote "minio"']
+    url = s3://lam
+    access_key_id = daki
+    secret_access_key = dakiminio
+    use_ssl = false
