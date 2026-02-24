@@ -1,25 +1,20 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torchvision.models as models
-from torchvision.io import decode_image
 import torchvision.transforms as transforms
-from torchvision.transforms import ToTensor
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
 import os
 from PIL import Image
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
-from collections import Counter
-from itertools import chain
-from torch.utils.data import WeightedRandomSampler
 
 
-dataset_path = r"/ceph/home/student.aau.dk/rk33gs/my_datasets/miniprojekt_dataset"
+dataset_path = (
+    r"/ceph/home/student.aau.dk/rk33gs/"
+    r"my_datasets/miniprojekt_dataset"
+)
 
 
 classes_to_idx = {
@@ -83,9 +78,12 @@ class CustomDataset(Dataset):
 test_set = CustomDataset(test_paths, test_labels, transform=val_test_transform)
 
 test_dataloader = DataLoader(
-    test_set, batch_size=32, shuffle=False, num_workers=2, pin_memory=True
+    test_set,
+    batch_size=32,
+    shuffle=False,
+    num_workers=2,
+    pin_memory=True,
 )
-
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -116,7 +114,9 @@ model.fc = nn.Sequential(
 for param in model.fc.parameters():
     param.requires_grad = True
 
-model.load_state_dict(torch.load("best_resnet50_emotion1.pth", map_location=device))
+model.load_state_dict(
+    torch.load("best_resnet50_emotion1.pth", map_location=device)
+)
 model = model.to(device)
 model.eval()
 
@@ -130,7 +130,14 @@ with torch.no_grad():
         all_preds.extend(preds.cpu().numpy())
         all_labels.extend(y_test.cpu().numpy())
 
-print(classification_report(all_labels, all_preds, target_names=classes_to_idx.keys()))
+print(
+    classification_report(
+        all_labels,
+        all_preds,
+        target_names=list(classes_to_idx.keys()),
+    )
+)
+
 
 cm = confusion_matrix(all_labels, all_preds)
 print("Confusion Matrix (rows = true labels, columns = predicted labels):")
