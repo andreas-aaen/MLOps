@@ -2,12 +2,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.models as models
-from torchvision.io import decode_image
 import torchvision.transforms as transforms
-from torchvision.transforms import ToTensor
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import os
 from PIL import Image
@@ -16,7 +13,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
 from collections import Counter
 
-dataset_path = r"/ceph/home/student.aau.dk/rk33gs/my_datasets/miniprojekt_dataset"
+dataset_path = (
+    r"/ceph/home/student.aau.dk/rk33gs/my_datasets/miniprojekt_dataset"
+)
 
 
 classes_to_idx = {
@@ -97,8 +96,9 @@ test_set = CustomDataset(test_paths, test_labels, transform=val_test_transform)
 class_counts = Counter(train_labels)
 num_classes = len(classes_to_idx)
 total_samples = len(train_labels)
-weights = [total_samples / (num_classes * class_counts[i]) for i in range(num_classes)]
-
+weights = [
+    total_samples / (num_classes * class_counts[i]) for i in range(num_classes)
+]
 
 train_dataloader = DataLoader(
     train_set, batch_size=32, shuffle=True, num_workers=4, pin_memory=True
@@ -194,9 +194,9 @@ for epoch in range(epochs):
     train_epoch_loss = running_train_loss / len(train_dataloader)
     train_loss_list.append(train_epoch_loss)
     print(
-        f"Training loss: {train_epoch_loss:.4f} Training accuracy: {train_epoch_acc:.4f}"
+        f"Training loss: {train_epoch_loss:.4f} "
+        f"Training accuracy: {train_epoch_acc:.4f}"
     )
-
     model.eval()
     running_val_loss = 0.0
     running_val_corrects = 0.0
@@ -216,7 +216,8 @@ for epoch in range(epochs):
     val_loss_list.append(val_epoch_loss)
 
     print(
-        f"Validation loss: {val_epoch_loss:.4f} Validation accuracy: {val_epoch_acc:.4f}"
+        f"Validation loss: {val_epoch_loss:.4f} "
+        f"Validation accuracy: {val_epoch_acc:.4f}"
     )
 
     if val_epoch_acc > best_acc:
@@ -224,7 +225,7 @@ for epoch in range(epochs):
         best_model_state = model.state_dict()
         torch.save(best_model_state, "best_resnet50_emotion1.pth")
 
-print(f"Best evaluation accuracy", best_acc)
+print("Best evaluation accuracy", best_acc)
 model.load_state_dict(best_model_state)
 model.eval()
 
@@ -238,7 +239,9 @@ with torch.no_grad():
         all_preds.extend(preds.cpu().numpy())
         all_labels.extend(y_val.cpu().numpy())
 
-print(classification_report(all_labels, all_preds, target_names=classes_to_idx.keys()))
+print(
+    classification_report(all_labels, all_preds, target_names=classes_to_idx.keys())
+)
 
 cm = confusion_matrix(all_labels, all_preds)
 print("Confusion Matrix (rows = true labels, columns = predicted labels):")
