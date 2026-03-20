@@ -1,0 +1,17 @@
+model:
+  num_classes: 7
+  pretrained: true
+
+training:
+  epochs: 15
+  batch_size: 32
+  weight_decay: 1.0e-4
+  max_lr: 1.0e-4
+  pct_start: 0.1
+  anneal_strategy: "cos"
+  random_state: 42
+
+data:
+  dataset_path: "/ceph/home/student.aau.dk/rk33gs/my_datasets/miniprojekt_dataset"
+  test_size: 0.1
+  val_size: 0.11

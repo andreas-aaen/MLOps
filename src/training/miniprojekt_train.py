@@ -12,11 +12,12 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
 from collections import Counter
+import yaml
 
-dataset_path = (
-    r"/ceph/home/student.aau.dk/rk33gs/my_datasets/miniprojekt_dataset"
-)
+with open("train_config.yaml") as f:
+    cfg = yaml.safe_load(f)
 
+dataset_path = cfg["data"]["dataset_path"]
 
 classes_to_idx = {
     "angry": 0,
@@ -28,10 +29,8 @@ classes_to_idx = {
     "surprise": 6,
 }
 
-
 image_path_list = []
 image_label_list = []
-
 
 for class_name, class_idx in classes_to_idx.items():
     folder_path = os.path.join(dataset_path, class_name)
@@ -40,14 +39,18 @@ for class_name, class_idx in classes_to_idx.items():
         image_path_list.append(file_path)
         image_label_list.append(class_idx)
 
-
 train_val_paths, test_paths, train_val_labels, test_labels = train_test_split(
-    image_path_list, image_label_list, test_size=0.1, random_state=42
+    image_path_list,
+    image_label_list,
+    test_size=cfg["data"]["test_size"],
+    random_state=cfg["training"]["random_state"],
 )
 train_paths, val_paths, train_labels, val_labels = train_test_split(
-    train_val_paths, train_val_labels, test_size=0.11, random_state=42
+    train_val_paths,
+    train_val_labels,
+    test_size=cfg["data"]["val_size"],
+    random_state=cfg["training"]["random_state"],
 )
-
 
 train_transform = transforms.Compose(
     [
@@ -88,9 +91,7 @@ class CustomDataset(Dataset):
 
 
 train_set = CustomDataset(train_paths, train_labels, transform=train_transform)
-
 val_set = CustomDataset(val_paths, val_labels, transform=val_test_transform)
-
 test_set = CustomDataset(test_paths, test_labels, transform=val_test_transform)
 
 class_counts = Counter(train_labels)
@@ -100,16 +101,17 @@ weights = [
     total_samples / (num_classes * class_counts[i]) for i in range(num_classes)
 ]
 
+batch_size = cfg["training"]["batch_size"]
+
 train_dataloader = DataLoader(
-    train_set, batch_size=32, shuffle=True, num_workers=4, pin_memory=True
+    train_set, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True
 )
 val_dataloader = DataLoader(
-    val_set, batch_size=32, shuffle=False, num_workers=4, pin_memory=True
+    val_set, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True
 )
 test_dataloader = DataLoader(
-    test_set, batch_size=32, shuffle=False, num_workers=4, pin_memory=True
+    test_set, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True
 )
-
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -119,7 +121,6 @@ else:
     device = torch.device("cpu")
 
 print(f"Using device: {device}")
-
 
 model = models.resnet50(weights="IMAGENET1K_V1")
 
@@ -134,7 +135,7 @@ model.fc = nn.Sequential(
     nn.Linear(model.fc.in_features, 256),
     nn.ReLU(),
     nn.Dropout(p=0.3),
-    nn.Linear(256, 7),
+    nn.Linear(256, cfg["model"]["num_classes"]),
 )
 
 for param in model.fc.parameters():
@@ -143,31 +144,31 @@ for param in model.fc.parameters():
 model = model.to(device)
 
 class_weights = torch.tensor(weights, dtype=torch.float).to(device)
-
 criterion = nn.CrossEntropyLoss(weight=class_weights)
 
 optimizer = optim.AdamW(
     [
-        {"params": model.layer4.parameters(), "lr": 1e-4},
-        {"params": model.fc.parameters(), "lr": 1e-4},
+        {"params": model.layer4.parameters(), "lr": cfg["training"]["max_lr"]},
+        {"params": model.fc.parameters(), "lr": cfg["training"]["max_lr"]},
     ],
-    weight_decay=1e-4,
+    weight_decay=cfg["training"]["weight_decay"],
 )
 
 scheduler = torch.optim.lr_scheduler.OneCycleLR(
     optimizer,
-    max_lr=1e-4,
-    epochs=15,
+    max_lr=cfg["training"]["max_lr"],
+    epochs=cfg["training"]["epochs"],
     steps_per_epoch=len(train_dataloader),
-    pct_start=0.1,
-    anneal_strategy="cos",
+    pct_start=cfg["training"]["pct_start"],
+    anneal_strategy=cfg["training"]["anneal_strategy"],
 )
 
 train_loss_list = []
 val_loss_list = []
 
-epochs = 15
+epochs = cfg["training"]["epochs"]
 best_acc = 0.0
+
 for epoch in range(epochs):
     print(f"epoch {epoch+1}/{epochs}")
     running_train_loss = 0.0
@@ -197,6 +198,7 @@ for epoch in range(epochs):
         f"Training loss: {train_epoch_loss:.4f} "
         f"Training accuracy: {train_epoch_acc:.4f}"
     )
+
     model.eval()
     running_val_loss = 0.0
     running_val_corrects = 0.0
