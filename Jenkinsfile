@@ -11,7 +11,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/yourusername/yourrepo.git'
+                git branch: 'main', url: 'https://github.com/andreas-aaen/MLOps.git'
             }
         }
 
@@ -24,7 +24,7 @@ pipeline {
 
         stage('Run Unit Tests') {
             steps {
-                sh 'pytest'
+                sh 'pytest.ini'
             }
         }
 
@@ -42,7 +42,7 @@ pipeline {
 
         stage('Evaluate Model') {
             steps {
-                sh "python3 evaluate.py --mlflow-uri ${MLFLOW_TRACKING_URI}"
+                sh "python3 test.py --mlflow-uri ${MLFLOW_TRACKING_URI}"
             }
         }
 
