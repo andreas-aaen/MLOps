@@ -1,5 +1,5 @@
 pipeline {
-    agent any  // run on the Jenkins server container
+    agent { label 'built-in' } // run on the Jenkins server container
 
     environment {
         IMAGE_NAME = "mlops_project_image"
@@ -28,7 +28,7 @@ pipeline {
 
         stage('Run Unit Tests') {
             steps {
-                sh 'pytest.ini'
+                sh 'pytest3 -m pytest'
             }
         }
 
