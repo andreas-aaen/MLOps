@@ -11,7 +11,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/andreas-aaen/MLOps.git'
+                git branch: 'Development', url: 'https://github.com/andreas-aaen/MLOps.git'
             }
         }
 
