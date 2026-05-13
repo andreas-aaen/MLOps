@@ -17,8 +17,12 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'python3 -m pip install --upgrade pip'
-                sh 'pip3 install -r requirements.txt'
+                sh 'hostname'
+                sh 'whoami'
+                sh 'which python3'
+                sh 'python3 --version'
+                sh 'which pip3 || true'
+                sh 'python3 -m pip --version'
             }
         }
 
