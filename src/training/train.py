@@ -1,32 +1,36 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import torchvision.models as models
-from torchvision.io import decode_image
 import torchvision.transforms as transforms
-from torchvision.transforms import ToTensor
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import os
 from PIL import Image
-import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report
 from collections import Counter
 import mlflow
 import mlflow.pytorch
 from mlflow.tracking import MlflowClient
 import time
 import yaml
+from thop import profile
 from models.resnet50 import ResNet50FineTuned
 from optimizers.adamw import adamw
 from schedulers.onecyclelr import onecyclelr
 
+mlflow.set_tracking_uri(
+    "sqlite:////ceph/home/student.aau.dk/<INDTAST_BRUGERNAVN>/mlflow.db"
+)
+
 mlflow.set_experiment("resnet50-emotion-classifier")
 
-with open("train_config.yaml") as f:
+# Enable system metrics monitoring
+# mlflow.config.enable_system_metrics_logging()
+# mlflow.config.set_system_metrics_sampling_interval()
+
+
+with open("config/train_config.yaml") as f:
     config = yaml.safe_load(f)
 
 dataset_config = config['dataset']
@@ -122,7 +126,6 @@ val_dataloader = DataLoader(val_set, batch_size=train_config['batch_size'],
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-
 model = ResNet50FineTuned(model_config)
 model = model.to(device)
 
@@ -132,15 +135,19 @@ criterion = nn.CrossEntropyLoss(weight=class_weights)
 optimizer = adamw(model, model_config, optimizer_config)
 scheduler = onecyclelr(optimizer, scheduler_config, train_dataloader)
 
+
+epochs = train_config["epochs"]
+
 train_loss_list = []
 val_loss_list = []
 
-epochs = train_config['epochs']
+with mlflow.start_run(run_name="training"):
 
 with mlflow.start_run():
     start_time = time.time()
 
-    mlflow.log_param("model", "resnet50")
+    mlflow.log_param("model", model_config["name"])
+    mlflow.log_param("batch_size", train_config["batch_size"])
     mlflow.log_param("epochs", epochs)
     mlflow.log_param("optimizer", "AdamW")
     mlflow.log_param("batch_size", train_config['batch_size'])
@@ -173,7 +180,9 @@ with mlflow.start_run():
         train_epoch_acc = running_train_corrects / len(train_set)
         train_epoch_loss = running_train_loss / len(train_dataloader)
         train_loss_list.append(train_epoch_loss)
-        print(f"Training loss: {train_epoch_loss:.4f} Training accuracy: {train_epoch_acc:.4f}")
+        print(
+            f"Training loss: {train_epoch_loss:.4f} Training accuracy: {train_epoch_acc:.4f}"
+        )
 
         model.eval()
         running_val_loss = 0.0
@@ -193,13 +202,20 @@ with mlflow.start_run():
         val_epoch_loss = running_val_loss / len(val_dataloader)
         val_loss_list.append(val_epoch_loss)
 
-        print(f"Validation loss: {val_epoch_loss:.4f} Validation accuracy: {val_epoch_acc:.4f}")
+        mlflow.log_metric("val_epoch_loss", val_epoch_loss, step=epoch)
+        mlflow.log_metric("val_epoch_accuracy", val_epoch_acc, step=epoch)
+
+        print(
+            f"Validation loss: {val_epoch_loss:.4f} Validation accuracy: {val_epoch_acc:.4f}"
+        )
 
         if val_epoch_acc > best_acc or best_model_state is None:
             best_acc = val_epoch_acc
             best_model_state = model.state_dict()
 
     print(f"Best evaluation accuracy: {best_acc:.4f}")
+
+    print(train_loss_list, val_loss_list)
 
     mlflow.log_metric("best_val_accuracy", best_acc)
 
@@ -242,17 +258,15 @@ with mlflow.start_run():
     plt.savefig('loss_plot.png', dpi=300, bbox_inches='tight')
     plt.close()
 
-    mlflow.log_artifact("loss_plot.png")
-
     end_time = time.time()
-    training_duration = end_time - start_time
-    mlflow.log_metric("training_duration_seconds", training_duration)
-    print(f"Training completed in {training_duration:.2f} seconds")
+    training_duration = (end_time - start_time) / 60
+    mlflow.log_metric("training_duration_minutes", training_duration)
+    print(f"Training completed in {training_duration:.2f} minutes")
 
     mlflow.pytorch.log_model(
-        model,
-        artifact_path="model",
-        registered_model_name="resnet50-emotion-classifier")
+        pytorch_model=model, artifact_path="model"
+    )  # Path name to the folder where the model artifact will be stored.
+    # registered_model_name="resnet50-emotion-classifier")
 
     # Transition the newly registered model to Staging automatically
     client = MlflowClient()
