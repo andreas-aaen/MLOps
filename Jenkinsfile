@@ -23,12 +23,13 @@ pipeline {
                 sh 'python3 --version'
                 sh 'which pip3 || true'
                 sh 'python3 -m pip --version'
+                sh 'python3 -m pip install -r requirements.txt'
             }
         }
 
         stage('Run Unit Tests') {
             steps {
-                sh 'pytest3 -m pytest'
+                sh 'python3 -m pytest'
             }
         }
 
