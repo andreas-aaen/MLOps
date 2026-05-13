@@ -11,7 +11,6 @@ from sklearn.metrics import classification_report
 from collections import Counter
 import mlflow
 import mlflow.pytorch
-from mlflow.tracking import MlflowClient
 import time
 import yaml
 from thop import profile
@@ -33,18 +32,26 @@ mlflow.set_experiment("resnet50-emotion-classifier")
 with open("config/train_config.yaml") as f:
     config = yaml.safe_load(f)
 
-dataset_config = config['dataset']
-model_config = config['model']
-train_config = config['train']
-optimizer_config = config['optimizer']
-scheduler_config = config['scheduler']
-evaluate_config = config['evaluate']
+dataset_config = config["dataset"]
 
-dataset_path = dataset_config['dataset_path']
-classes_to_idx = config['classes']
+model_config = config["model"]
+
+train_config = config["train"]
+
+optimizer_config = config["optimizer"]
+
+scheduler_config = config["scheduler"]
+
+evaluate_config = config["evaluate"]
+
+dataset_path = dataset_config["dataset_path"]
+
+classes_to_idx = config["classes"]
+
 
 image_path_list = []
 image_label_list = []
+
 
 for class_name, class_idx in classes_to_idx.items():
     folder_path = os.path.join(dataset_path, class_name)
@@ -55,35 +62,49 @@ for class_name, class_idx in classes_to_idx.items():
 
 
 train_val_paths, test_paths, train_val_labels, test_labels = train_test_split(
-    image_path_list, image_label_list,
-    test_size=dataset_config['test_size'],
-    random_state=dataset_config['random_state'])
-
+    image_path_list,
+    image_label_list,
+    test_size=dataset_config["test_size"],
+    random_state=dataset_config["random_state"],
+)
 train_paths, val_paths, train_labels, val_labels = train_test_split(
-    train_val_paths, train_val_labels,
-    test_size=dataset_config['test_size'],
-    random_state=dataset_config['random_state'])
+    train_val_paths,
+    train_val_labels,
+    test_size=dataset_config["test_size"],
+    random_state=dataset_config["random_state"],
+)
 
 
-train_transform = transforms.Compose([
-    transforms.RandomResizedCrop(size=train_config['RandomResizedCrop']['size'],
-                                 scale=train_config['RandomResizedCrop']['scale']),
-    transforms.RandomHorizontalFlip(p=train_config['RandomHorizontalFlip']['p']),
-    transforms.RandomRotation(degrees=train_config['RandomRotation']['degrees']),
-    transforms.ColorJitter(brightness=train_config['ColorJitter']['brightness'],
-                           contrast=train_config['ColorJitter']['contrast']),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=train_config['Normalize']['mean'],
-                         std=train_config['Normalize']['std'])
-])
+train_transform = transforms.Compose(
+    [
+        transforms.RandomResizedCrop(
+            size=train_config["RandomResizedCrop"]["size"],
+            scale=tuple(train_config["RandomResizedCrop"]["scale"]),
+        ),
+        transforms.RandomHorizontalFlip(p=train_config["RandomHorizontalFlip"]["p"]),
+        transforms.RandomRotation(degrees=train_config["RandomRotation"]["degrees"]),
+        transforms.ColorJitter(
+            brightness=train_config["ColorJitter"]["brightness"],
+            contrast=train_config["ColorJitter"]["contrast"],
+        ),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=train_config["Normalize"]["mean"], std=train_config["Normalize"]["std"]
+        ),
+    ]
+)
 
-val_test_transform = transforms.Compose([
-    transforms.Resize(size=evaluate_config['Resize']['size']),
-    transforms.CenterCrop(size=evaluate_config['CenterCrop']['size']),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=evaluate_config['Normalize']['mean'],
-                         std=evaluate_config['Normalize']['std'])
-])
+val_test_transform = transforms.Compose(
+    [
+        transforms.Resize(size=evaluate_config["Resize"]["size"]),
+        transforms.CenterCrop(size=evaluate_config["CenterCrop"]["size"]),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=evaluate_config["Normalize"]["mean"],
+            std=evaluate_config["Normalize"]["std"],
+        ),
+    ]
+)
 
 
 class CustomDataset(Dataset):
@@ -104,7 +125,9 @@ class CustomDataset(Dataset):
 
 
 train_set = CustomDataset(train_paths, train_labels, transform=train_transform)
+
 val_set = CustomDataset(val_paths, val_labels, transform=val_test_transform)
+
 
 class_counts = Counter(train_labels)
 num_classes = len(classes_to_idx)
@@ -112,27 +135,36 @@ total_samples = len(train_labels)
 weights = [total_samples / (num_classes * class_counts[i]) for i in range(num_classes)]
 
 
-train_dataloader = DataLoader(train_set, batch_size=train_config['batch_size'],
-                              shuffle=train_config['shuffle'],
-                              num_workers=train_config['num_workers'],
-                              pin_memory=train_config['pin_memory'])
+train_dataloader = DataLoader(
+    train_set,
+    batch_size=train_config["batch_size"],
+    shuffle=train_config["shuffle"],
+    num_workers=train_config["num_workers"],
+    pin_memory=train_config["pin_memory"],
+)
 
-val_dataloader = DataLoader(val_set, batch_size=train_config['batch_size'],
-                            shuffle=evaluate_config['shuffle'],
-                            num_workers=train_config['num_workers'],
-                            pin_memory=evaluate_config['pin_memory'])
+val_dataloader = DataLoader(
+    val_set,
+    batch_size=train_config["batch_size"],
+    shuffle=evaluate_config["shuffle"],
+    num_workers=train_config["num_workers"],
+    pin_memory=evaluate_config["pin_memory"],
+)
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 model = ResNet50FineTuned(model_config)
+
 model = model.to(device)
 
 class_weights = torch.tensor(weights, dtype=torch.float).to(device)
+
 criterion = nn.CrossEntropyLoss(weight=class_weights)
 
 optimizer = adamw(model, model_config, optimizer_config)
+
 scheduler = onecyclelr(optimizer, scheduler_config, train_dataloader)
 
 
@@ -143,19 +175,27 @@ val_loss_list = []
 
 with mlflow.start_run(run_name="training"):
 
-with mlflow.start_run():
+    mlflow.log_param("test_param", 123)
+    mlflow.log_metric("test_metric", 0.5)
+
+    # Logging model parameters and flops by running a single tensor, consistent with the shape of the images,
+    # through the model.
+    dummy_input = torch.randn(1, 3, 224, 224).to(device)
+    model.eval()
+    with torch.no_grad():
+        flops, params = profile(model, inputs=(dummy_input,))
+    mlflow.log_metric("model_params", params)
+    mlflow.log_metric("model_flops", flops)
+
     start_time = time.time()
 
     mlflow.log_param("model", model_config["name"])
     mlflow.log_param("batch_size", train_config["batch_size"])
     mlflow.log_param("epochs", epochs)
-    mlflow.log_param("optimizer", "AdamW")
-    mlflow.log_param("batch_size", train_config['batch_size'])
-    mlflow.log_param("learning_rate", optimizer_config['lr'])
+    mlflow.log_param("optimizer", optimizer_config["name"])
+    mlflow.log_param("learning_rate", optimizer_config["lr"])
 
     best_acc = 0.0
-    best_model_state = None
-
     for epoch in range(epochs):
         print(f"epoch {epoch+1}/{epochs}")
         running_train_loss = 0.0
@@ -167,6 +207,7 @@ with mlflow.start_run():
             y_train = y_train.to(device)
 
             optimizer.zero_grad()
+
             output_train = model(X_train)
             train_loss = criterion(output_train, y_train)
             train_loss.backward()
@@ -183,6 +224,9 @@ with mlflow.start_run():
         print(
             f"Training loss: {train_epoch_loss:.4f} Training accuracy: {train_epoch_acc:.4f}"
         )
+
+        mlflow.log_metric("train_epoch_loss", train_epoch_loss, step=epoch)
+        mlflow.log_metric("train_epoch_accuracy", train_epoch_acc, step=epoch)
 
         model.eval()
         running_val_loss = 0.0
@@ -209,11 +253,11 @@ with mlflow.start_run():
             f"Validation loss: {val_epoch_loss:.4f} Validation accuracy: {val_epoch_acc:.4f}"
         )
 
-        if val_epoch_acc > best_acc or best_model_state is None:
+        if val_epoch_acc > best_acc:
             best_acc = val_epoch_acc
             best_model_state = model.state_dict()
 
-    print(f"Best evaluation accuracy: {best_acc:.4f}")
+    print(f"Best evaluation accuracy", best_acc)
 
     print(train_loss_list, val_loss_list)
 
@@ -235,27 +279,30 @@ with mlflow.start_run():
             all_labels.extend(y_val.cpu().numpy())
 
     report = classification_report(
-        all_labels,
-        all_preds,
-        target_names=list(classes_to_idx.keys()),
-        output_dict=True)
+        all_labels, all_preds, target_names=classes_to_idx.keys(), output_dict=True
+    )
 
     accuracy = report["accuracy"]
+
     mlflow.log_metric("final_val_accuracy", accuracy)
 
-    print(classification_report(
-        all_labels,
-        all_preds,
-        target_names=list(classes_to_idx.keys())))
+    print(
+        classification_report(all_labels, all_preds, target_names=classes_to_idx.keys())
+    )
 
     plt_epochs = range(1, epochs + 1)
-    plt.plot(plt_epochs, train_loss_list, label='Train Loss')
-    plt.plot(plt_epochs, val_loss_list, label='Validation Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Training and Validation Loss')
+    plt.plot(plt_epochs, train_loss_list, label="Train Loss")
+    plt.plot(plt_epochs, val_loss_list, label="Validation Loss")
+
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Training and Validation Loss")
     plt.legend()
-    plt.savefig('loss_plot.png', dpi=300, bbox_inches='tight')
+
+    plt.savefig("loss_plot.png", dpi=300, bbox_inches="tight")
+
+    mlflow.log_figure(plt.gcf(), "loss_plot.png")
+
     plt.close()
 
     end_time = time.time()
@@ -269,13 +316,14 @@ with mlflow.start_run():
     # registered_model_name="resnet50-emotion-classifier")
 
     # Transition the newly registered model to Staging automatically
-    client = MlflowClient()
-    latest_version_info = client.get_latest_versions(
-        "resnet50-emotion-classifier", stages=["None"])[0]
-    client.transition_model_version_stage(
-        name="resnet50-emotion-classifier",
-        version=latest_version_info.version,
-        stage="Staging",
-        archive_existing_versions=False
-    )
-    print(f"Model version {latest_version_info.version} moved to Staging.")
+    # from mlflow.tracking import MlflowClient
+
+    # client = MlflowClient()
+    # latest_version_info = client.get_latest_versions("resnet50-emotion-classifier", stages=["None"])[0]
+    # client.transition_model_version_stage(
+    #     name="resnet50-emotion-classifier",
+    #     version=latest_version_info.version,
+    #     stage="Staging",
+    #     archive_existing_versions=False  # optional
+    # )
+    # print(f"Model version {latest_version_info.version} moved to Staging.")

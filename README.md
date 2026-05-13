@@ -9,14 +9,10 @@ metrics:
 model_name: resnet50
 ---
 
-# Emotion Classifier (resnet50)
+## Model describtion 
+The model is a **resnet50**, pretrained on ImageNet and fine-tuned for facial emotion recognition 
 
-Dette model card er genereret automatisk.
-
-## Model Beskrivelse
-Modellen er en **resnet50**, prætrænet på ImageNet og fine-tuned til følelsesgenkendelse.
-
-### Arkitektur Detaljer:
+### architecture Detaljer:
 - **Prætrænet:** True
 - **Hidden Units:** 256
 - **Dropout:** 0.4 (FC1) og 0.3 (FC2)
